@@ -66,26 +66,28 @@ class Taunt(State):
 
 class HuntTower(State):
 
-    def enter(self):
-        enemyTowers = getEnemyTowers(self.agent.getTeam())
+    def enter(self, oldstate):
+        enemyTowers = self.agent.world.getEnemyTowers(self.agent.getTeam())
         targetTower = getClosest(enemyTowers, self.agent.getLocation())
-        otherTower = otherTower(targetTower, enemyTowers)
+        otherTower = getOtherTower(targetTower, enemyTowers)
+
+        targetLoc = targetTower.getLocation()
+        otherLoc = otherTower.getLocation()
+
         possibleDest = self.agent.getPossibleDestinations()
-        possibleDest = [d for d in possibleDest if distance(d, targetTower) < MINIONRANGE] 
+        possibleDest = [d for d in possibleDest if distance(d, targetLoc) < MINIONRANGE] 
 
         alpha = 0.5 #weight for distance to tower 
         beta = -1.0 * 0.5 #weight for distance to other tower 
 
         rankDestinations = []
         for i, tower in enumerate(possibleDest):
-            rankDestinations.append( (i, alpha * distance(self.agent.getLocation(), targetTower) + beta * \
-                            distance(self.agent.getLocation(), otherTower) ) )
+            rankDestinations.append( (i, alpha * distance(self.agent.getLocation(), targetLoc) + beta * \
+                            distance(self.agent.getLocation(), otherLoc) ) )
 
         rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
         dest = possibleDest[rankDestinations[0][0]]
         self.agent.navigateTo(dest)
-
-        return None
     
     def execute(self, delta = 0):
 
@@ -95,7 +97,7 @@ class HuntTower(State):
 """
 Get the other tower.
 """
-def otherTower(tower, enemyTowers):
+def getOtherTower(tower, enemyTowers):
     for t in enemyTowers:
         if t != tower:
             return t
