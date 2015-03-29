@@ -9,7 +9,7 @@ from moba import *
 import time
 
 ############## Constants ##############
-HITPOINTSDIFF = 2
+HITPOINTSDIFF = 1 #TODO changed to 1 from 2
 HERORANGE = 250
 MINIONPERCENT = 0.3
 HEROPERCENT = 0.5
@@ -21,9 +21,9 @@ BASERANGE = 1
 RUNFROMHERO = 300
 RUNCOUNTER = 30
 ATDEST = 20
-SHUFFLECOUNTER = 150
+SHUFFLECOUNTER = 35
 
-VERBOSE = 1 # change to 1 to have comments printed
+VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
 TIMEIT2 = 0
 #######################################
@@ -66,7 +66,7 @@ class Idle(State):
     def execute(self, delta = 0):
 
         # self.agent.changeState( HuntEnemyMinion )
-        self.agent.changeState( HuntEnemyTowers, None, SHUFFLECOUNTER )
+        self.agent.changeState( HuntEnemyTowers, None, 0 )
 
         ### YOUR CODE GOES ABOVE HERE ###
         return None
@@ -81,46 +81,68 @@ class HuntEnemyTowers(State):
         self.counter = args[1]
         self.bestDestinations = None  
         self.targetTower = None 
+        self.notTargetTower = None
 
     def enter(self, oldstate):
 
         if VERBOSE == 1:
-
-            print "HuntEnemyTowers"
+          print "HuntEnemyTowers"
 
         towers = self.agent.world.getEnemyTowers(self.agent.getTeam())
         base = self.agent.world.getEnemyBases(self.agent.getTeam())
         enemyHero = getEnemyHero(self.agent)
         # print base
-        if len(base) > 0 and len(towers) > 0 and enemyHero != None:
-
-            # base = base[0]
-            self.counter = SHUFFLECOUNTER
-
+        if len(base) > 0 and enemyHero != None:
+          # base = base[0]
+          if towers != []:
             self.targetTower = getClosest(towers, self.agent.getLocation())
+            self.notTargetTower = getOtherTower(self.targetTower, towers) # self.notTargetTower = getFarthest(towers, self.agent.getLocation()) TODO change back?
             targetLoc = self.targetTower.getLocation()
-            # targetLoc = base.getLocation()
-            possibleDest = self.agent.getPossibleDestinations()
-            possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < HERORANGE \
-                             and distance(d, targetLoc) > (HERORANGE - 150) ) ] 
+          else:
+            self.targetTower = base[0]
 
-            rankDestinations = []
-            for i, nextPos in enumerate(possibleDest):
+            if VERBOSE == 1:
+                print "towers out"
 
-                towerWeight = sum([0.5*distance(nextPos, t.getLocation()) for t in towers])
-                # baseWeight = -1.0*0.5*distance(nextPos, base.getLocation()) 
-                baseWeight = sum([0.5*distance(nextPos, t.getLocation()) for t in base])
-                heroWeight = 0.5 * distance( nextPos, enemyHero.getLocation() )
-                rankDestinations.append( ( i, towerWeight + baseWeight + heroWeight ) )
+            targetLoc = base[0].getLocation()
+          
+          # targetLoc = base.getLocation()
+          possibleDest = self.agent.getPossibleDestinations()
+          newPossibleDest = []
+          for dest in possibleDest:
+            distance2Towers = [(distance(dest, t.getLocation()) < HERORANGE and distance(dest, t.getLocation()) > (HERORANGE - 150)) for t in towers]
+            if all(distance2Towers):
+              newPossibleDest.append(dest) 
+            
+          #possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < HERORANGE \
+          #                 and distance(d, targetLoc) > (HERORANGE - 150) ) ] 
 
-            rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
+          rankDestinations = []
+          for i, nextPos in enumerate(newPossibleDest):
+            if self.notTargetTower != None: #TODO check if towers, otherwise thirs throws NoneType error
+                towerWeight = -1.0*(0.5*distance(nextPos, self.targetTower.getLocation()) - 0.5*distance(nextPos, self.notTargetTower.getLocation()))
+            else:
+                towerWeight = -1.0 * ( 0.5 * distance( nextPos, self.targetTower.getLocation() ) )
+            #towerWeight = -1.0*([0.5*distance(nextPos, t.getLocation()) for t in towers])
+            # baseWeight = -1.0*0.5*distance(nextPos, base.getLocation()) 
+            if towers == []:
+              baseWeight = -1.0*sum([0.6*distance(nextPos, t.getLocation()) for t in base])
+            else:
+              baseWeight = sum([0.6*distance(nextPos, t.getLocation()) for t in base])
+            heroWeight = 0.45 * distance( nextPos, enemyHero.getLocation() )
+            rankDestinations.append( ( i, towerWeight + baseWeight + heroWeight ) )
 
-            self.bestDestinations = [ possibleDest[rankDestinations[i][0]] for i in range(5) ]
+          rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
 
+          self.bestDestinations = [ newPossibleDest[rankDestinations[i][0]] for i in range(5) ]
+
+          #if self.dest == None: TODO
+          if self.counter <= 0 or self.dest == None:
             self.dest = random.choice(self.bestDestinations)
-        
-            self.agent.navigateTo(self.dest)
-            drawCross(self.agent.world.debug,self.dest, (255, 0, 0), 10)
+            self.counter = SHUFFLECOUNTER
+      
+        self.agent.navigateTo(self.dest) #TODO indent back
+        drawCross(self.agent.world.debug,self.dest, (255, 0, 0), 10)
 
     def execute(self, delta = 0):
 
@@ -141,10 +163,13 @@ class HuntEnemyTowers(State):
         if self.agent.getHitpoints() <  MINIONPERCENT*self.agent.getMaxHitpoints():
             self.agent.changeState( TouchBase, None )
 
-        elif (inShootingRange(self.agent, enemyHero, HERORANGE) and ( self.agent.getLevel() - enemyHero.getLevel() ) < HITPOINTSDIFF):
-            self.agent.changeState( Run, None, RUNCOUNTER )
+        #TODO uncomment
+        # elif (inShootingRange(self.agent, enemyHero, HERORANGE) and ( self.agent.getLevel() - enemyHero.getLevel() ) < HITPOINTSDIFF):
+        #     self.agent.changeState( Run, None, RUNCOUNTER )
 
         elif inShootingRange(self.agent, self.targetTower, HERORANGE):
+            if self.agent.canAreaEffect and areaEffectInRange(self.agent, enemyAgents):
+                self.agent.areaEffect()
             self.agent.turnToFace(self.targetTower.getLocation())
             self.agent.shoot()            
 
@@ -165,7 +190,7 @@ class HuntEnemyTowers(State):
             #     self.
             self.agent.changeState(HuntEnemyTowers, self.dest, self.counter  - 1) 
 
-        return
+        return None
 
 class HuntEnemyHero(State):
     # if hunting hero and hitpoints < 50% then touch base
@@ -556,6 +581,16 @@ class TouchBase(State):
 
 ############## Helpers ##############
 """
+Get the other tower.
+"""
+def getOtherTower(tower, enemyTowers):
+    for t in enemyTowers:
+        if t != tower:
+            return t
+    return None
+
+
+"""
 Given a list of positions and a current agent position, compute distances
 to every position in the list. Return the closest distance. Distances are 
 calculated as Manhattan distances.
@@ -583,6 +618,19 @@ def getClosest(list, currPos):
         for l in list:
             dist.append( (l, distance( currPos, l.getLocation() )) )
         dist.sort(key = lambda x:x[1])
+        # tuple (item, distance)
+        return dist[0][0]
+
+def getFarthest(list, currPos):
+
+    if list == None or currPos == None or len(list) == 0:
+        return None
+
+    else:
+        dist = []
+        for l in list:
+            dist.append( (l, distance( currPos, l.getLocation() )) )
+        dist.sort(key = lambda x:x[1], reverse=True)
         # tuple (item, distance)
         return dist[0][0]
 
