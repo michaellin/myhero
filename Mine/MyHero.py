@@ -21,6 +21,7 @@ BASERANGE = 1
 RUNFROMHERO = 300
 RUNCOUNTER = 30
 ATDEST = 20
+SHUFFLECOUNTER = 150
 
 VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
@@ -36,7 +37,7 @@ class MyHero(Hero):
 		### Add your states to self.states (but don't remove Idle)
 		### YOUR CODE GOES BELOW HERE ###
 		# self.states.append(Run) #TODO
-		self.states.extend([HuntEnemyHero, HuntEnemyMinion, TouchBase, Run, Search])
+		self.states.extend([HuntEnemyHero, HuntEnemyMinion, TouchBase, Run, Search, HuntEnemyTowers])
 
 
 		self.worldDim = world.getDimensions()
@@ -64,13 +65,105 @@ class Idle(State):
 	
 	def execute(self, delta = 0):
 
-		self.agent.changeState( HuntEnemyMinion )
+		# self.agent.changeState( HuntEnemyMinion )
+		self.agent.changeState( HuntEnemyTowers, None, SHUFFLECOUNTER )
 
 		### YOUR CODE GOES ABOVE HERE ###
 		return None
 
 ###############################
 ### YOUR STATE CLASSES GO HERE:
+
+class HuntEnemyTowers(State):
+
+    def parseArgs(self, args):
+        self.dest = args[0]
+        self.counter = args[1]
+        self.bestDestinations = None  
+        self.targetTower = None 
+
+    def enter(self, oldstate):
+
+        if VERBOSE == 1:
+
+            print "HuntEnemyTowers"
+
+        towers = self.agent.world.getEnemyTowers(self.agent.getTeam())
+        base = self.agent.world.getEnemyBases(self.agent.getTeam())
+        # print base
+        if (self.dest == None or self.counter == 0) and len(base) > 0 and len(towers) > 0:
+
+            # base = base[0]
+            self.counter = SHUFFLECOUNTER
+
+            self.targetTower = getClosest(towers, self.agent.getLocation())
+            targetLoc = self.targetTower.getLocation()
+            # targetLoc = base.getLocation()
+            possibleDest = self.agent.getPossibleDestinations()
+            possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < HERORANGE \
+                             and distance(d, targetLoc) > (HERORANGE - 150) ) ] 
+
+            rankDestinations = []
+            for i, nextPos in enumerate(possibleDest):
+
+                towerWeight = sum([0.5*distance(nextPos, t.getLocation()) for t in towers])
+                # baseWeight = -1.0*0.5*distance(nextPos, base.getLocation()) 
+                baseWeight = sum([0.5*distance(nextPos, t.getLocation()) for t in base])
+
+                rankDestinations.append( ( i, towerWeight + baseWeight ) )
+
+            rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
+
+            self.bestDestinations = [ possibleDest[rankDestinations[i][0]] for i in range(5) ]
+
+            self.dest = random.choice(self.bestDestinations)
+        
+        self.agent.navigateTo(self.dest)
+        drawCross(self.agent.world.debug,self.dest, (255, 0, 0), 10)
+
+    def execute(self, delta = 0):
+
+        inRangeBullets = bulletsInRange(self.agent)
+        enemyAgents = self.agent.world.getEnemyNPCs(self.agent.getTeam())
+        enemyAgents = [e for e in enemyAgents if inShootingRange(self.agent, e, HERORANGE)]
+
+        # enemyTowers = self.agent.world.getEnemyTowers(self.agent.getTeam())
+        # enemyBases = self.agent.world.getEnemyBases(self.agent.getTeam())
+
+
+        if self.agent.getHitpoints() <  enemyHero.getHitpoints(): #HEROPERCENT*self.agent.getMaxHitpoints():
+            self.agent.changeState( TouchBase, None )
+
+        elif inShootingRange(self.agent, self.targetTower, HERORANGE):
+            self.agent.turnToFace(self.targetTower.getLocation())
+            self.agent.shoot()            
+
+        elif len(enemyAgents) > 0:
+            # closestTarget = getClosest(enemyAgents, self.agent.getLocation())
+            # self.agent.turnToFace(closestTarget.getLocation())
+            # self.agent.shoot()
+            if self.agent.canAreaEffect and areaEffectInRange(self.agent, enemyAgents):
+                self.agent.areaEffect()
+            else:
+                target = getClosest( enemyAgents, self.agent.getLocation() )
+                if inShootingRange(self.agent, target, HERORANGE):
+                    self.agent.turnToFace( target.getLocation() )
+                    self.agent.shoot()
+
+        # dodge a bullet if it's close enough
+        elif len(inRangeBullets) > 0:
+            bullet = inRangeBullets[0]
+            angle = getDodgeAngle(self.agent, bullet)
+            if angle != None:
+                # print "dodge"
+                self.agent.dodge(angle)
+
+        else:
+            # if self.dest == None:
+            #     self.
+            self.agent.changeState(HuntEnemyTowers, self.dest, self.counter  - 1) 
+
+        return
 
 class HuntEnemyHero(State):
 	# if hunting hero and hitpoints < 50% then touch base
@@ -101,7 +194,7 @@ class HuntEnemyHero(State):
 				bullet = inRangeBullets[0]
 				angle = getDodgeAngle(self.agent, bullet)
 				if angle != None:
-					print "dodge"
+					# print "dodge"
 					self.agent.dodge(angle)
 
 			# if agent hitpoints is less than MINIONPERCENT --> TouchBase

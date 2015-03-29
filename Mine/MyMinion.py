@@ -70,6 +70,7 @@ class Taunt(State):
 class ProtectBase(State):
 
     def parseArgs(self, args):
+        
         self.dest = args[0]
         self.counter = args[1]
         self.bestDestinations = None
