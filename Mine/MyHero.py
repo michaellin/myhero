@@ -22,7 +22,7 @@ RUNFROMHERO = 300
 RUNCOUNTER = 30
 ATDEST = 20
 
-VERBOSE = 1 # change to 1 to have comments printed
+VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
 #######################################
 ### MyHero
@@ -272,7 +272,7 @@ class Search(State):
 					target = allEnemyMinions[allEnemyMinionScores[0][0]].getLocation()
 
 			if target != None:
-				print "target is ", target
+				# print "target is ", target
 				self.agent.navigateTo( target )
 
 		return None

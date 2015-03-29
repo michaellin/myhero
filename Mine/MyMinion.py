@@ -9,6 +9,7 @@ from moba import *
 ############## Constants ##############
 MINIONRANGE = 250
 ATDEST = 20
+DODGERANGE = 250
 
 VERBOSE = 1 # change to 1 to have comments printed
 
@@ -19,7 +20,7 @@ class MyMinion(Minion):
         self.states = [Idle]
         ### Add your states to self.states (but don't remove Idle)
         ### YOUR CODE GOES BELOW HERE ###
-        self.states.extend([HuntTower])
+        self.states.extend([HuntTower, Dodge])
         ### YOUR CODE GOES ABOVE HERE ###
 
     def start(self):
@@ -41,7 +42,7 @@ class Idle(State):
     def execute(self, delta = 0):
         State.execute(self, delta)
         ### YOUR CODE GOES BELOW HERE ###
-        self.agent.changeState(HuntTower)
+        self.agent.changeState(HuntTower, None, None)
         ### YOUR CODE GOES ABOVE HERE ###
         return None
 
@@ -66,34 +67,142 @@ class Taunt(State):
 
 class HuntTower(State):
 
+    def parseArgs(self, args):
+        self.dest = args[0]
+        self.targetTower = args[1]
+
     def enter(self, oldstate):
+
+        if VERBOSE == 1:
+            print "HuntTower"
+        
         enemyTowers = self.agent.world.getEnemyTowers(self.agent.getTeam())
-        targetTower = getClosest(enemyTowers, self.agent.getLocation())
-        otherTower = getOtherTower(targetTower, enemyTowers)
+        if self.dest == None and len(enemyTowers) > 0:
+            self.targetTower = getClosest(enemyTowers, self.agent.getLocation())
+            otherTower = getOtherTower(self.targetTower, enemyTowers)
 
-        targetLoc = targetTower.getLocation()
-        otherLoc = otherTower.getLocation()
+            targetLoc = self.targetTower.getLocation()
+            otherLoc = otherTower.getLocation()
 
-        possibleDest = self.agent.getPossibleDestinations()
-        possibleDest = [d for d in possibleDest if distance(d, targetLoc) < MINIONRANGE] 
+            possibleDest = self.agent.getPossibleDestinations()
+            possibleDest = [d for d in possibleDest if distance(d, targetLoc) < MINIONRANGE] 
 
-        alpha = 0.5 #weight for distance to tower 
-        beta = -1.0 * 0.5 #weight for distance to other tower 
+            alpha = 0.5 #weight for distance to tower 
+            beta = -1.0 * 0.5 #weight for distance to other tower 
 
-        rankDestinations = []
-        for i, tower in enumerate(possibleDest):
-            rankDestinations.append( (i, alpha * distance(self.agent.getLocation(), targetLoc) + beta * \
-                            distance(self.agent.getLocation(), otherLoc) ) )
+            rankDestinations = []
+            for i, nextPos in enumerate(possibleDest):
+                rankDestinations.append( (i, alpha * distance(nextPos, targetLoc) + beta * \
+                                distance(nextPos, otherLoc) ) )
 
-        rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
-        dest = possibleDest[rankDestinations[0][0]]
-        self.agent.navigateTo(dest)
+            rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
+            # print rankDestinations
+            self.dest = possibleDest[rankDestinations[0][0]]
+        
+            self.agent.navigateTo(self.dest)
+            drawCross(self.agent.world.debug,self.dest, (0, 255, 0), 5)
+
+        # print self.agent.isMoving()
+        # if atDestination(self.agent.getLocation(), self.dest):
     
+    def execute(self, delta = 0):        
+
+        inRangeBullets = bulletsInRange(self.agent)
+        enemyAgents = self.agent.world.getEnemyNPCs(self.agent.getTeam())
+        enemyAgents = [e for e in enemyAgents if inShootingRange(self.agent, e, MINIONRANGE)]
+        enemyTowers = self.agent.world.getEnemyTowers(self.agent.getTeam())
+        enemyBases = self.agent.world.getEnemyBases(self.agent.getTeam())
+
+        if len(enemyTowers) == 0 and len(enemyBases) > 0:
+            self.agent.changeState(HuntBase)
+
+        # elif len(inRangeBullets) > 0:
+        #     bullet = inRangeBullets[0]
+        #     self.agent.changeState(Dodge, self, None, bullet) 
+
+        elif inShootingRange(self.agent, self.targetTower, MINIONRANGE):
+            self.agent.turnToFace(self.targetTower.getLocation())
+            self.agent.shoot()
+
+        elif len(enemyAgents) > 0:
+            closestTarget = getClosest(enemyAgents, self.agent.getLocation())
+            self.agent.turnToFace(closestTarget.getLocation())
+            self.agent.shoot()
+
+        else:
+            self.agent.changeState(HuntTower, self.dest, self.targetTower) 
+
+class HuntBase(State):
+
+    def parseArgs(self, args):
+        return
+
+    def enter(self, oldstate):
+
+        if VERBOSE == 1:
+            print "HuntBase"
+
+
+class Dodge(State):
+
+    def parseArgs(self, args):
+        # self.originalDest = args[0]
+        # self.object = args[1]
+        self.oldstate = args[0]
+        self.dodgeDest = args[1]
+        self.bullet = args[2]
+
+    def enter(self, oldstate):
+
+        if VERBOSE == 1:
+            print "Dodge"
+
+        if self.dodgeDest ==  None:
+            self.dodgeDest = minionDodgeLoc(self.agent, self.bullet)
+            if self.dodgeDest != None:
+                self.agent.navigateTo(self.dodgeDest)
+
+        else:
+            if atDestination(self.agent.getLocation(), self.dodgeDest):
+
+                if isinstance(self.oldstate, HuntTower):
+                    self.agent.navigateTo(self.oldstate.dest)
+                    self.agent.changeState(HuntTower, self.oldstate.dest, self.oldstate.targetTower) 
+
     def execute(self, delta = 0):
 
-        return None
+        self.agent.changeState(Dodge, self.oldstate, self.dodgeDest, self.bullet)
+
+# class Sh
 
 ############## Helpers ##############
+def minionDodgeLoc(agent, bullet):
+    possibleDest = agent.getPossibleDestinations()
+    orientation = bullet.orientation
+    # TODO change
+    for a in [90, 270]:
+        angle = orientation + a
+        vector = (math.cos(math.radians(angle)), -math.sin(math.radians(angle)))
+        diff = (vector[0]*agent.getRadius()*1.5, vector[1]*agent.getRadius()*1.5)
+        newPos = ( agent.getLocation()[0] + diff[0], agent.getLocation()[1] + diff[1] ) 
+        if inPossibleDestinations(newPos, possibleDest):
+            return newPos
+    return None
+
+def getDodgeAngle(agent, bullet):
+    possibleDest = agent.getPossibleDestinations()
+    orientation = bullet.orientation
+    # TODO change
+    for a in range(0, 360): #[90, 270]:
+        angle = orientation + a
+        vector = (math.cos(math.radians(angle)), -math.sin(math.radians(angle)))
+        diff = (vector[0]*agent.getRadius()*1.5, vector[1]*agent.getRadius()*1.5)
+        newPos = ( agent.getLocation()[0] + diff[0], agent.getLocation()[1] + diff[1] ) 
+        if inPossibleDestinations(newPos, possibleDest):
+            # print "angle, ", angle
+            return angle
+    return None
+
 """
 Get the other tower.
 """
@@ -185,8 +294,10 @@ def bulletsInRange(agent):
     world = agent.world
     allBullets = world.getBullets()
     inRangeBullets = []
+
     for bullet in allBullets:
-        if ( distance( bullet.getLocation() , agent.getLocation() ) < DODGERANGE ):
+        # print bullet.getOwner().getTeam()
+        if ( (bullet.getOwner().getTeam() != agent.getTeam()) and ( distance( bullet.getLocation() , agent.getLocation() ) < DODGERANGE ) ):
             inRangeBullets.append( bullet )
     return inRangeBullets
 
@@ -216,7 +327,7 @@ The shooting range is given as a parameter.
 """
 def inShootingRange(agent, target, range):
     visible = agent.getVisible()
-    if (target in visible) and (distance(target.getLocation(), agent.getLocation()) < range):
+    if ( (target in visible) and (distance(target.getLocation(), agent.getLocation()) < range) ):
         return True
     return False
 
