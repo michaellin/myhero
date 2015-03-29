@@ -10,6 +10,8 @@ from moba import *
 MINIONRANGE = 250
 ATDEST = 20
 DODGERANGE = 250
+PROTECTCOUNTER = 150
+DODGECOUNTER = 5
 
 VERBOSE = 0 # change to 1 to have comments printed
 
@@ -42,7 +44,7 @@ class Idle(State):
     def execute(self, delta = 0):
         State.execute(self, delta)
         ### YOUR CODE GOES BELOW HERE ###
-        self.agent.changeState(ProtectBase, None)
+        self.agent.changeState(ProtectBase, None, PROTECTCOUNTER)
         ### YOUR CODE GOES ABOVE HERE ###
         return None
 
@@ -69,8 +71,8 @@ class ProtectBase(State):
 
     def parseArgs(self, args):
         self.dest = args[0]
+        self.counter = args[1]
         self.bestDestinations = None
-        self.destCounter = None
 
     def enter(self, oldstate):
 
@@ -81,10 +83,12 @@ class ProtectBase(State):
         towers = self.agent.world.getTowersForTeam(self.agent.getTeam())
         base = self.agent.world.getBaseForTeam(self.agent.getTeam())
 
-        if self.dest == None:
+        if self.dest == None or self.counter == 0:
 
             # self.targetTower = getClosest(towers, self.agent.getLocation())
             # targetLoc = self.targetTower.getLocation()
+
+            self.counter = PROTECTCOUNTER
 
             targetLoc = base.getLocation()
             possibleDest = self.agent.getPossibleDestinations()
@@ -107,6 +111,8 @@ class ProtectBase(State):
         
         self.agent.navigateTo(self.dest)
         drawCross(self.agent.world.debug,self.dest, (255, 0, 0), 10)
+
+        # print self.counter
     
     def execute(self, delta = 0):        
 
@@ -124,12 +130,12 @@ class ProtectBase(State):
 
         if len(inRangeBullets) > 0:
             bullet = getClosest(inRangeBullets, self.agent.getLocation())
-            self.agent.changeState(Dodge, 5, None) 
+            self.agent.changeState(Dodge, DODGECOUNTER, None) 
 
         else:
             # if self.dest == None:
             #     self.
-            self.agent.changeState(ProtectBase, self.dest) 
+            self.agent.changeState(ProtectBase, self.dest, self.counter  - 1) 
 
 
 class Dodge(State):
@@ -163,7 +169,7 @@ class Dodge(State):
 
         if self.counter == 0:
 
-            self.agent.changeState(ProtectBase, self.dest)
+            self.agent.changeState(ProtectBase, self.dest, PROTECTCOUNTER)
 
         else:
             self.agent.changeState(Dodge, self.counter - 1, self.dest)
