@@ -20,7 +20,7 @@ class MyMinion(Minion):
         self.states = [Idle]
         ### Add your states to self.states (but don't remove Idle)
         ### YOUR CODE GOES BELOW HERE ###
-        self.states.extend([ProtectBase, Dodge])
+        self.states.extend([HuntTower, Dodge])
         ### YOUR CODE GOES ABOVE HERE ###
 
     def start(self):
@@ -42,7 +42,7 @@ class Idle(State):
     def execute(self, delta = 0):
         State.execute(self, delta)
         ### YOUR CODE GOES BELOW HERE ###
-        self.agent.changeState(ProtectBase, None)
+        self.agent.changeState(HuntTower, None, None)
         ### YOUR CODE GOES ABOVE HERE ###
         return None
 
@@ -64,110 +64,6 @@ class Taunt(State):
 
 ##############################
 ### YOUR STATES GO HERE:
-
-class ProtectBase(State):
-
-    def parseArgs(self, args):
-        self.dest = args[0]
-        self.bestDestinations = None
-        self.destCounter = None
-
-    def enter(self, oldstate):
-
-        if VERBOSE == 1:
-
-            print "ProtectBase"
-
-        towers = self.agent.world.getTowersForTeam(self.agent.getTeam())
-        bases = self.agent.world.getBasesForTeam(self.agent.getTeam())
-
-        if self.dest == None and len(towers) > 0:
-
-            self.targetTower = getClosest(towers, self.agent.getLocation())
-            targetLoc = self.targetTower.getLocation()
-
-            possibleDest = self.agent.getPossibleDestinations()
-            possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < MINIONRANGE \
-                             and distance(d, targetLoc) > (MINIONRANGE - 100) ) ] 
-
-            rankDestinations = []
-            for i, nextPos in enumerate(possibleDest):
-
-                towerWeight = sum([-1.0*0.5*distance(nextPos, t.getLocation()) for t in towers])
-                baseWeight = sum([-1.0*0.5*distance(nextPos, t.getLocation()) for t in bases])
-
-                rankDestinations.append( ( i, towerWeight + baseWeight ) )
-
-            rankDestinations = sorted(rankDestinations, key=lambda x: x[1], reverse = True)
-
-            self.bestDestinations = [ possibleDest[rankDestinations[i][0]] for i in range(5) ]
-
-            self.dest = random.choice(self.bestDestinations)
-        
-        self.agent.navigateTo(self.dest)
-        drawCross(self.agent.world.debug,self.dest, (255, 0, 0), 10)
-    
-    def execute(self, delta = 0):        
-
-        inRangeBullets = bulletsInRange(self.agent)
-        enemyAgents = self.agent.world.getEnemyNPCs(self.agent.getTeam())
-        enemyAgents = [e for e in enemyAgents if inShootingRange(self.agent, e, MINIONRANGE)]
-
-        # enemyTowers = self.agent.world.getEnemyTowers(self.agent.getTeam())
-        # enemyBases = self.agent.world.getEnemyBases(self.agent.getTeam())
-
-        if len(enemyAgents) > 0:
-            closestTarget = getClosest(enemyAgents, self.agent.getLocation())
-            self.agent.turnToFace(closestTarget.getLocation())
-            self.agent.shoot()
-
-        if len(inRangeBullets) > 0:
-            bullet = getClosest(inRangeBullets, self.agent.getLocation())
-            self.agent.changeState(Dodge, 5, None) 
-
-        else:
-            # if self.dest == None:
-            #     self.
-            self.agent.changeState(ProtectBase, self.dest) 
-
-
-
-class Dodge(State):
-
-    def parseArgs(self, args):
-        # self.originalDest = args[0]
-        # self.object = args[1]
-        self.counter = args[0]
-        self.dest = args[1]
-
-    def enter(self, oldstate):
-
-        if VERBOSE == 1:
-            print "Dodge"
-
-        base = self.agent.world.getBaseForTeam(self.agent.getTeam())
-        if self.counter == None:
-            possibleDest = self.agent.getPossibleDestinations()
-
-            if len(base) > 0:
-                possibleDest = [d for d in possibleDest if \
-                ( distance(self.agent.getLocation(), d) < 50 and distance(d, base[0].getLocation()) < 100 ) ]
-
-            else:
-                possibleDest = [d for d in possibleDest if (distance(self.agent.getLocation(), d) < 50 and )]
-
-            self.dest = random.choice(possibleDest)
-            self.agent.navigateTo( self.dest )
-
-    def execute(self, delta = 0):
-
-        if self.counter == 0:
-
-            self.agent.changeState(ProtectBase, self.dest)
-
-        else:
-            self.agent.changeState(Dodge, self.counter - 1, self.dest)
-
 
 class HuntTower(State):
 
@@ -264,6 +160,49 @@ class HuntBase(State):
         if VERBOSE == 1:
             print "HuntBase"
 
+
+class ProtectBase(State):
+
+    def parseArgs(self, args):
+        return
+
+    def enter(self, oldstate):
+
+        if VERBOSE == 1:
+            print "ProtectBase"
+
+
+class Dodge(State):
+
+    def parseArgs(self, args):
+        # self.originalDest = args[0]
+        # self.object = args[1]
+        self.oldstate = args[0]
+        self.dodgeDest = args[1]
+        self.bullet = args[2]
+
+    def enter(self, oldstate):
+
+        if VERBOSE == 1:
+            print "Dodge"
+
+        if self.dodgeDest ==  None:
+            self.dodgeDest = minionDodgeLoc(self.agent, self.bullet)
+            print self.dodgeDest
+            if self.dodgeDest != None:
+                self.agent.navigateTo(self.dodgeDest)
+
+        else:
+            if atDestination(self.agent.getLocation(), self.dodgeDest):
+                # print self.oldstate
+                if isinstance(self.oldstate, HuntTower):
+                    # print "changing"
+                    self.agent.navigateTo(self.oldstate.dest)
+                    self.agent.changeState(HuntTower, self.oldstate.dest, self.oldstate.targetTower) 
+
+    def execute(self, delta = 0):
+
+        self.agent.changeState(Dodge, self.oldstate, self.dodgeDest, self.bullet)
 
 ############## Helpers ##############
 def minionDodgeLoc(agent, bullet):
