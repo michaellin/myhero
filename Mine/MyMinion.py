@@ -79,7 +79,7 @@ class ProtectBase(State):
             print "ProtectBase"
 
         towers = self.agent.world.getTowersForTeam(self.agent.getTeam())
-        bases = self.agent.world.getBasesForTeam(self.agent.getTeam())
+        base = self.agent.world.getBaseForTeam(self.agent.getTeam())
 
         if self.dest == None and len(towers) > 0:
 
@@ -94,7 +94,7 @@ class ProtectBase(State):
             for i, nextPos in enumerate(possibleDest):
 
                 towerWeight = sum([-1.0*0.5*distance(nextPos, t.getLocation()) for t in towers])
-                baseWeight = sum([-1.0*0.5*distance(nextPos, t.getLocation()) for t in bases])
+                baseWeight = -1.0*0.5*distance(nextPos, base.getLocation()) 
 
                 rankDestinations.append( ( i, towerWeight + baseWeight ) )
 
@@ -131,7 +131,6 @@ class ProtectBase(State):
             self.agent.changeState(ProtectBase, self.dest) 
 
 
-
 class Dodge(State):
 
     def parseArgs(self, args):
@@ -149,12 +148,12 @@ class Dodge(State):
         if self.counter == None:
             possibleDest = self.agent.getPossibleDestinations()
 
-            if len(base) > 0:
+            if base != None:
                 possibleDest = [d for d in possibleDest if \
-                ( distance(self.agent.getLocation(), d) < 50 and distance(d, base[0].getLocation()) < 100 ) ]
+                ( distance(self.agent.getLocation(), d) < 50 and distance(d, base.getLocation()) < 100 ) ]
 
             else:
-                possibleDest = [d for d in possibleDest if (distance(self.agent.getLocation(), d) < 50 and )]
+                possibleDest = [d for d in possibleDest if (distance(self.agent.getLocation(), d) < 50)]
 
             self.dest = random.choice(possibleDest)
             self.agent.navigateTo( self.dest )
