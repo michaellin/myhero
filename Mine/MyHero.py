@@ -22,7 +22,7 @@ RUNFROMHERO = 300
 RUNCOUNTER = 30
 ATDEST = 20
 
-VERBOSE = 1 # change to 1 to have comments printed
+VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
 TIMEIT2 = 1
 #######################################
