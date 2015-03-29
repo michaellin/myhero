@@ -83,6 +83,7 @@ class HuntEnemyHero(State):
 	def enter(self, oldstate):
 
 		if VERBOSE == 1:
+
 			print "HuntEnemyHero"
 
 		return None
@@ -239,7 +240,13 @@ class Search(State):
 
 		# search enemy hero
 		if enemyHero != None and self.agent != None:
-			if ( ( self.agent.getLevel() - enemyHero.getLevel() ) >= HITPOINTSDIFF ): 
+
+			# go recover
+			if self.agent.getHitpoints() < MINIONPERCENT*self.agent.getMaxHitpoints():
+
+				self.agent.changeState( TouchBase, None )
+
+			elif ( ( self.agent.getLevel() - enemyHero.getLevel() ) >= HITPOINTSDIFF ): 
 				
 				if VERBOSE == 1:
 					print "Search hero"
