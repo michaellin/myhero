@@ -24,6 +24,7 @@ ATDEST = 20
 
 VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
+TIMEIT2 = 1
 #######################################
 ### MyHero
 
@@ -98,8 +99,8 @@ class HuntEnemyHero(State):
 			if len(inRangeBullets) > 0:
 				bullet = inRangeBullets[0]
 				angle = getDodgeAngle(self.agent, bullet)
-				if angle:
-					# print "dodge"
+				if angle != None:
+					print "dodge"
 					self.agent.dodge(angle)
 
 			# if agent hitpoints is less than MINIONPERCENT --> TouchBase
@@ -124,7 +125,7 @@ class HuntEnemyHero(State):
 
 			# nothing visible or in range --> Search
 			else:
-				self.agent.changeState( Search )
+				self.agent.changeState( Search, 5 )
 
 		return None
 
@@ -167,7 +168,7 @@ class HuntEnemyMinion(State):
 		minionsList = enemyMinionsInShootingRange(self.agent, HERORANGE)
 		inRangeBullets = bulletsInRange(self.agent)
 
-		if enemyHero and self.agent:
+		if enemyHero != None and self.agent != None:
 
 			# dodge a bullet if it's close enough
 			# if len(inRangeBullets) > 0:
@@ -179,26 +180,21 @@ class HuntEnemyMinion(State):
 
 			# if agent hitpoints is less than MINIONPERCENT --> TouchBase
 			if self.agent.getHitpoints() < MINIONPERCENT*self.agent.getMaxHitpoints():
-				# print "1"
 				self.agent.changeState( TouchBase, None )
 
 			# if agent level is greater than the enemy level --> HuntEnemyHero
 			elif ( ( self.agent.getLevel() - enemyHero.getLevel() ) >= HITPOINTSDIFF ): 
-				# print "2"
 				self.agent.changeState( HuntEnemyHero )
 
 			# if enemyHero is visible --> Run
 			elif inShootingRange(self.agent, enemyHero, RUNFROMHERO):
-				# print "3"
 				self.agent.changeState( Run, None, RUNCOUNTER )
 
 			# if any minion is visible and in shooting range, shoot it
 			elif minionsList:
 				if self.agent.canAreaEffect and areaEffectInRange(self.agent, minionsList + [enemyHero]):
 					self.agent.areaEffect()
-					# print "4"
 				else:
-					# print "5"
 					target = getClosest( minionsList, self.agent.getLocation() )
 					if inShootingRange(self.agent, target, HERORANGE):
 						self.agent.turnToFace( target.getLocation() )
@@ -208,7 +204,7 @@ class HuntEnemyMinion(State):
 			# if no minions are visible or in range --> Search
 			else: 
 				# print "6"
-				self.agent.changeState( Search )
+				self.agent.changeState( Search, 5 )
 
 		return None
 
@@ -221,10 +217,9 @@ is close and in range, then will switch to HuntEnemyMinion.
 """
 class Search(State):
 	# args [  ]
-	# def parseArgs(self, args):
-	#   # argsList = args[0]
-	#   self.world = None
-	#   self.enemyMinions = None
+	def parseArgs(self, args):
+	  # argsList = args[0]
+		self.targetCounter = args[0]
 
 	def enter(self, oldstate):
 		if TIMEIT == 1:
@@ -243,7 +238,7 @@ class Search(State):
 		# print "enemy health: ", enemyHero.getHitpoints()
 
 		# search enemy hero
-		if self.agent and enemyHero:
+		if enemyHero != None and self.agent != None:
 			if ( ( self.agent.getLevel() - enemyHero.getLevel() ) >= HITPOINTSDIFF ): 
 				
 				if VERBOSE == 1:
@@ -262,7 +257,7 @@ class Search(State):
 				if len(allEnemyMinions) > 0:
 					allEnemyMinionScores = []
 					alpha = 0.5 #weight for distance from the minion
-					beta = 0.5 #weight for distance from minion to hero
+					beta = 0.8 #weight for distance from minion to hero
 					for i, em in enumerate(allEnemyMinions):
 						allEnemyMinionScores.append( (i, alpha*distance(self.agent.getLocation(), em.getLocation()) \
 													- beta*distance(em.getLocation(), getEnemyHero(self.agent).getLocation())) )
@@ -271,9 +266,10 @@ class Search(State):
 					#target = getClosestDistances(self.agent.getPossibleDestinations(), closestMinion.getLocation())
 					target = allEnemyMinions[allEnemyMinionScores[0][0]].getLocation()
 
-			if target != None:
-				# print "target is ", target
+			self.targetCounter -= 1
+			if self.targetCounter == 0:
 				self.agent.navigateTo( target )
+				self.targetCounter = 8
 
 		return None
 	
@@ -281,7 +277,7 @@ class Search(State):
 		visibleMinions = enemyMinionsInShootingRange(self.agent, HERORANGE)
 		enemyHero = getEnemyHero(self.agent)
 		inRangeBullets = bulletsInRange(self.agent)
-		if enemyHero and self.agent:
+		if enemyHero != None and self.agent != None:
 
 			# hero level > enemy level and enemyHero in shooting range:
 			if ( ( self.agent.getLevel() - enemyHero.getLevel() ) >= HITPOINTSDIFF ):
@@ -290,7 +286,7 @@ class Search(State):
 					self.agent.changeState( HuntEnemyHero )
 				else:
 					# print "1"
-					self.agent.changeState( Search )
+					self.agent.changeState( Search, self.targetCounter )
 
 			# hero level < enemy level
 			else: # self.agent.getLevel() - enemyHero.getLevel() ) < HITPOINTSDIFF 
@@ -299,8 +295,7 @@ class Search(State):
 				if len(inRangeBullets) > 0:
 					bullet = inRangeBullets[0]
 					angle = getDodgeAngle(self.agent, bullet)
-					if angle:
-						# print "dodge"
+					if angle != None:
 						self.agent.dodge(angle)
 
 				elif visibleMinions:
@@ -309,8 +304,7 @@ class Search(State):
 				elif inShootingRange( self.agent, enemyHero, RUNFROMHERO ):
 					self.agent.changeState( Run, None, RUNCOUNTER )
 				else:
-					# print "2"
-					self.agent.changeState( Search )
+					self.agent.changeState( Search, self.targetCounter)
 
 			if TIMEIT:
 				print time.time()-self.start_t
@@ -335,10 +329,14 @@ class Run(State):
 		enemyHero = getEnemyHero(self.agent)
 		# print "agent ", self.agent.getLocation()
 		# print "dest ", self.dest
+		if TIMEIT2 == 1:
+			self.start_t = time.time()		
+
+		if VERBOSE == 1:
+			print "Run"
+
 		if self.dest == None: #or atDestination(self.agent.getLocation(), self.dest ) :
 			
-			if VERBOSE == 1:
-				print "Run"
 	
 			if enemyHero != None:
 				self.dest = runDestination(self.agent, enemyHero)
@@ -360,7 +358,7 @@ class Run(State):
 		# if not inShootingRange(self.agent, enemyHero, HERORANGE) and self.runCounter == 0:
 		if (not inShootingRange(self.agent, enemyHero, HERORANGE) and self.runCounter == 0) or atDestination(self.agent.getLocation(), self.dest):
 			# print "stuck here"
-			self.agent.changeState( Search )
+			self.agent.changeState( Search, 5 )
 		# keep running
 		else:
 			# print "try to dodge"
@@ -370,16 +368,17 @@ class Run(State):
 				bullet = inRangeBullets[0]
 				angle = getDodgeAngle(self.agent, bullet)
 				# print angle
-				if angle:
-					# print "dodge"
+				if angle != None:
+					print "dodge"
 					self.agent.dodge(angle)
 
-			if enemyHero and self.agent:
-				if self.agent.canAreaEffect and areaEffectInRange(self.agent, [enemyHero] + minionsList):
+			if enemyHero!= None and self.agent!= None:
+				if self.agent.canAreaEffect and areaEffectInRange(self.agent, [enemyHero,] + minionsList):
 					self.agent.areaEffect()
 
 				else:
-					target = getClosest( minionsList, self.agent.getLocation() )
+					print "shoot while run"
+					target = getClosest( [enemyHero,] + minionsList, self.agent.getLocation() )
 					if target != None:
 						if inShootingRange(self.agent, target, HERORANGE):
 							self.agent.turnToFace( target.getLocation() )
@@ -388,6 +387,9 @@ class Run(State):
 			# print "in else: ", self.dest
 			# print "minus 1"
 			self.agent.changeState( Run, self.dest, self.runCounter - 1)
+
+			if TIMEIT2:
+				print time.time()-self.start_t
 
 		return None
 
@@ -416,8 +418,11 @@ class TouchBase(State):
 			# print "re-compute"
 			world = self.agent.world
 			base = world.getBaseForTeam(self.agent.getTeam())
-			self.dest = base.getLocation()
-			self.agent.navigateTo(self.dest)
+			if (base != None):
+				self.dest = base.getLocation()
+				self.agent.navigateTo(self.dest)
+			else:
+				print "There is no base!"
 
 		return None
 	
@@ -542,15 +547,19 @@ def getDodgeAngle(agent, bullet):
 	possibleDest = agent.getPossibleDestinations()
 	orientation = bullet.orientation
 	# TODO change
-	for a in [90, 270]:
-		angle = orientation + a
-		vector = (math.cos(math.radians(angle)), -math.sin(math.radians(angle)))
-		diff = (vector[0]*agent.getRadius()*1.5, vector[1]*agent.getRadius()*1.5)
-		newPos = ( agent.getLocation()[0] + diff[0], agent.getLocation()[1] + diff[1] ) 
+	myOrientation = agent.orientation
+	if abs(myOrientation - (90 + orientation)) < abs(myOrientation - (270 + orientation)):
+		angle = 90 + orientation
+	else:
+		angle = 270 + orientation
+
+	vector = (math.cos(math.radians(angle)), -math.sin(math.radians(angle)))
+	diff = (vector[0]*agent.getRadius()*1.5, vector[1]*agent.getRadius()*1.5)
+	newPos = ( agent.getLocation()[0] + diff[0], agent.getLocation()[1] + diff[1] ) 
 		
-		if inPossibleDestinations(newPos, possibleDest):
-			# print "angle, ", angle
-			return angle
+	if inPossibleDestinations(newPos, possibleDest):
+		# print "angle, ", angle
+		return angle
 
 	return None
 

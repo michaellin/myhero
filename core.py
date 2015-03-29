@@ -220,7 +220,7 @@ class Agent(Mover):
 	def update(self, delta):
 		Mover.update(self, delta)
 		if self.moveTarget is not None:
-			drawCross(self.world.background, self.moveTarget, (0, 0, 0), 5)
+			#drawCross(self.world.background, self.moveTarget, (0, 0, 0), 5)
 			direction = [m - n for m,n in zip(self.moveTarget,self.rect.center)]
 			# Figure out distance to moveTarget
 #			mag = reduce(lambda x, y: (x**2)+(y**2), direction)**0.5 
