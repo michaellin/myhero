@@ -13,7 +13,7 @@ DODGERANGE = 250
 PROTECTCOUNTER = 150
 DODGECOUNTER = 5
 
-VERBOSE = 1 # change to 1 to have comments printed
+VERBOSE = 0 # change to 1 to have comments printed
 
 class MyMinion(Minion):
     
