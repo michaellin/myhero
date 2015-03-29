@@ -93,7 +93,7 @@ class ProtectBase(State):
             targetLoc = base.getLocation()
             possibleDest = self.agent.getPossibleDestinations()
             possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < MINIONRANGE \
-                             and distance(d, targetLoc) > (MINIONRANGE - 100) ) ] 
+                             and distance(d, targetLoc) > (MINIONRANGE - 150) ) ] 
 
             rankDestinations = []
             for i, nextPos in enumerate(possibleDest):
