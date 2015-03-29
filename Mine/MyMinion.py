@@ -11,7 +11,7 @@ MINIONRANGE = 250
 ATDEST = 20
 DODGERANGE = 250
 
-VERBOSE = 1 # change to 1 to have comments printed
+VERBOSE = 0 # change to 1 to have comments printed
 
 class MyMinion(Minion):
     

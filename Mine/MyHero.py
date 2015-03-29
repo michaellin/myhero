@@ -24,7 +24,7 @@ ATDEST = 20
 
 VERBOSE = 0 # change to 1 to have comments printed
 TIMEIT = 0
-TIMEIT2 = 1
+TIMEIT2 = 0
 #######################################
 ### MyHero
 
@@ -356,7 +356,7 @@ class Run(State):
 
 		# ran away
 		# if not inShootingRange(self.agent, enemyHero, HERORANGE) and self.runCounter == 0:
-		if (not inShootingRange(self.agent, enemyHero, HERORANGE) and self.runCounter == 0) or atDestination(self.agent.getLocation(), self.dest):
+		if (not inShootingRange(self.agent, enemyHero, HERORANGE) and self.runCounter <= 0) or atDestination(self.agent.getLocation(), self.dest):
 			# print "stuck here"
 			self.agent.changeState( Search, 5 )
 		# keep running
