@@ -81,11 +81,12 @@ class ProtectBase(State):
         towers = self.agent.world.getTowersForTeam(self.agent.getTeam())
         base = self.agent.world.getBaseForTeam(self.agent.getTeam())
 
-        if self.dest == None and len(towers) > 0:
+        if self.dest == None:
 
-            self.targetTower = getClosest(towers, self.agent.getLocation())
-            targetLoc = self.targetTower.getLocation()
+            # self.targetTower = getClosest(towers, self.agent.getLocation())
+            # targetLoc = self.targetTower.getLocation()
 
+            targetLoc = base.getLocation()
             possibleDest = self.agent.getPossibleDestinations()
             possibleDest = [d for d in possibleDest if ( distance(d, targetLoc) < MINIONRANGE \
                              and distance(d, targetLoc) > (MINIONRANGE - 100) ) ] 
