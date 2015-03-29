@@ -267,7 +267,7 @@ class Search(State):
 					target = allEnemyMinions[allEnemyMinionScores[0][0]].getLocation()
 
 			self.targetCounter -= 1
-			if self.targetCounter == 0:
+			if self.targetCounter == 0 and target != None:
 				self.agent.navigateTo( target )
 				self.targetCounter = 8
 
