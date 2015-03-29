@@ -377,7 +377,6 @@ class Run(State):
 					self.agent.areaEffect()
 
 				else:
-					print "shoot while run"
 					target = getClosest( [enemyHero,] + minionsList, self.agent.getLocation() )
 					if target != None:
 						if inShootingRange(self.agent, target, HERORANGE):
